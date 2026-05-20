@@ -34,6 +34,7 @@ import com.example.ui.screens.TerminalScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.CodexTeal
 import com.example.ui.theme.TerminalCyan
+import com.example.ui.theme.TerminalGreen
 import com.example.ui.viewmodel.CodexViewModel
 import kotlinx.coroutines.delay
 
@@ -53,7 +54,7 @@ class MainActivity : ComponentActivity() {
                     label = "boot_crossfade"
                 ) { booting ->
                     if (booting) {
-                        BootupScreen()
+                        BootupScreen(viewModel)
                     } else {
                         MainNavigationScreen(viewModel)
                     }
@@ -69,7 +70,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun BootupScreen() {
+fun BootupScreen(viewModel: CodexViewModel) {
     var logsToShow by remember { mutableStateOf<List<String>>(emptyList()) }
     val fullLogs = listOf(
         "⚙️ [  0.000000] Booting PRoot-distro Ubuntu environment on Android ARM64...",
@@ -81,6 +82,9 @@ fun BootupScreen() {
         "🔌 [  1.121920] Node.js service is initialised and listening on localhost:8080.",
         "✨ [  1.328932] Handshake complete! Codex Ubuntu active and ready to code."
     )
+
+    val installStatus by viewModel.installStatus.collectAsState()
+    val installProgress by viewModel.installProgress.collectAsState()
 
     // Stream lines on bootup sequence
     LaunchedEffect(Unit) {
@@ -120,15 +124,31 @@ fun BootupScreen() {
                     color = CodexTeal
                 )
                 Text(
-                    text = "Ultra-Low Footprint Node.js Daemon",
+                    text = "Real Ubuntu RootFS Downloader & PRoot wrapper",
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color.Gray
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center
                 )
             }
 
             // Custom polygon loader in center
             PolygonalLoader(sides = 6, size = 150.dp)
+            
+            // Installation Progress UI
+            if (installProgress < 1f || installStatus.contains("Ошибка")) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = installStatus, color = Color.White, fontFamily = FontFamily.Monospace)
+                    LinearProgressIndicator(
+                        progress = { installProgress },
+                        modifier = Modifier.fillMaxWidth(0.8f).height(8.dp),
+                        color = TerminalCyan,
+                        trackColor = Color.DarkGray
+                    )
+                }
+            } else {
+                Text("Установка завершена", color = TerminalGreen, fontFamily = FontFamily.Monospace)
+            }
 
             // Dynamic Bootup Logs Box (like Linux startup sequences)
             Box(

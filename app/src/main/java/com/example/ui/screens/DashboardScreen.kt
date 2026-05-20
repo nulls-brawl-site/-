@@ -83,7 +83,7 @@ fun DashboardScreen(viewModel: CodexViewModel) {
                 )
                 Column {
                     Text(
-                        text = "Ubuntu 24.04 (PRoot-Distro)",
+                        text = "Ubuntu 24.04 (PRoot Sandbox)",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -98,7 +98,7 @@ fun DashboardScreen(viewModel: CodexViewModel) {
                                 .background(if (isDaemonActive) Color(0xFF4AF626) else Color.Red)
                         )
                         Text(
-                            text = if (isDaemonActive) "Активен • Node.js Codex Port запущен" else "Инициализация...",
+                            text = if (isDaemonActive) "Активен • Локальный движок JS запущен" else "Инициализация...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )

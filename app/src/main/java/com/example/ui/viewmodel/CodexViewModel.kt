@@ -13,12 +13,14 @@ import com.example.data.AppDatabase
 import com.example.data.CodexMessage
 import com.example.data.CodexRepository
 import com.example.data.TerminalCommand
+import com.example.data.EnvironmentInstaller
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
 
 class CodexViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
+    val installer = EnvironmentInstaller(application)
     val repository = CodexRepository(
         application,
         database.terminalDao(),
@@ -35,6 +37,9 @@ class CodexViewModel(application: Application) : AndroidViewModel(application) {
     val isDaemonActive: StateFlow<Boolean> = repository.isDaemonActive
     val ramUsageMb: StateFlow<Int> = repository.ramUsageMb
     val cpuUsagePercent: StateFlow<Int> = repository.cpuUsagePercent
+    
+    val installProgress = installer.installProgress
+    val installStatus = installer.installStatus
 
     // State tracks
     private val _isBooting = MutableStateFlow(true)
@@ -55,7 +60,10 @@ class CodexViewModel(application: Application) : AndroidViewModel(application) {
     init {
         // Run booting animation sequence
         viewModelScope.launch {
-            repository.initializeDaemon()
+            val installed = installer.installEnvironment()
+            if (installed) {
+                repository.initializeDaemon()
+            }
             _isBooting.value = false
         }
         checkPermissions()

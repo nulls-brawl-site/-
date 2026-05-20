@@ -56,79 +56,49 @@ class ShellRunner(private val context: Context) {
             }
         }
 
-        // 2. Intercept virtual ubuntu indicators / simulations
-        if (trimmed == "proot-distro list" || trimmed == "proot-distro status") {
-            return@withContext Pair(
-                "Installed distributions:\n  * ubuntu (alias: ubuntu) [Running]\n" +
-                "Virtual resources occupied: 124MB RAM | virtual_fs: 520MB\n" +
-                "State: Active. Port forwarding enabled on 127.0.0.1:8080", true
-            )
-        }
+        // For all other commands, attempt real execution using ProcessBuilder
+        // Check if our Ubuntu PRoot is installed
+        val prootBin = File(context.filesDir, "proot")
+        val rootFsDir = File(context.filesDir, "ubuntu_rootfs")
+        val useProot = prootBin.exists() && rootFsDir.exists()
 
-        if (trimmed == "node -v") {
-            return@withContext Pair("v20.12.2 (Ultra-Low Footprint Mode Enabled)", true)
-        }
-
-        if (trimmed == "npm -v" || trimmed == "codex -v") {
-            return@withContext Pair("10.5.0\ncodex-agent v1.4-android", true)
-        }
-
-        if (trimmed.startsWith("apt install") || trimmed.startsWith("apt-get install")) {
-            return@withContext Pair(
-                "Reading package lists... Done\n" +
-                "Building dependency tree... Done\n" +
-                "All packages are up to date! Codex daemon is fully configured.", true
-            )
-        }
-
-        // 3. Command: ls customization for cleaner look
-        if (mainCmd == "ls") {
-            try {
-                val files = curDirectory.listFiles()
-                if (files.isNullOrEmpty()) {
-                    return@withContext Pair("(directory is empty)", true)
-                }
-                val result = files.joinToString("\n") { file ->
-                    val prefix = if (file.isDirectory) "📁 [DIR] " else "📄 [FILE] "
-                    val size = if (file.isDirectory) "" else " (${file.length()} B)"
-                    prefix + file.name + size
-                }
-                return@withContext Pair(result, true)
-            } catch (e: Exception) {
-                return@withContext Pair("ls: Permission denied or error: ${e.message}", false)
-            }
-        }
-
-        // 4. Fallback: Execute real Android Shell command using native /system/bin/sh
         try {
-            // Map virtual path back safely if needed
             val processBuilder = ProcessBuilder()
                 .directory(curDirectory)
             
-            // On android we run commands using sh -c
-            processBuilder.command("sh", "-c", trimmed)
+            val env = processBuilder.environment()
+            env["PROOT_TMP_DIR"] = context.cacheDir.absolutePath
+            env["HOME"] = "/root"
+
+            if (useProot) {
+                // Real PRoot execution wrapper mapping Android files to /
+                val commandList = listOf(
+                    prootBin.absolutePath,
+                    "--link2symlink",
+                    "-0", // act as root
+                    "-r", rootFsDir.absolutePath,
+                    "-b", "/dev",
+                    "-b", "/proc",
+                    "-b", "${context.filesDir.absolutePath}:/root", // Mount app files at /root
+                    "-w", curDirectory.absolutePath.replace(context.filesDir.absolutePath, "/root"),
+                    "/usr/bin/env", "bash", "-c", trimmed
+                )
+                processBuilder.command(commandList)
+            } else {
+                // Standard Android Shell fallback if PRoot isn't set up yet
+                processBuilder.command("sh", "-c", trimmed)
+            }
             
+            processBuilder.redirectErrorStream(true)
             val process = processBuilder.start()
-            val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
-            val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
+            val outputStr = process.inputStream.bufferedReader().use { it.readText() }
             
-            val output = StringBuilder()
-            var line: String?
-            while (stdoutReader.readLine().also { line = it } != null) {
-                output.append(line).append("\n")
-            }
-            val errOutput = StringBuilder()
-            while (stderrReader.readLine().also { line = it } != null) {
-                errOutput.append(line).append("\n")
-            }
-            
-            process.waitFor()
-            val exitCode = process.exitValue()
+            val exitCode = process.waitFor()
             
             val finalResult = if (exitCode == 0) {
-                if (output.isEmpty() && errOutput.isEmpty()) "Command executed successfully." else output.toString()
+                if (outputStr.isEmpty()) "Command executed successfully." else outputStr
             } else {
-                if (errOutput.isNotEmpty()) errOutput.toString() else "Command failed with exit code $exitCode\n${output.toString()}"
+                if (outputStr.isEmpty()) "Command failed with exit code $exitCode" else outputStr
             }
             
             return@withContext Pair(finalResult.trimEnd(), exitCode == 0)
