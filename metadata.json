@@ -1,0 +1,6 @@
+{
+  "name": "Codex Ubuntu",
+  "description": "Premium OpenAI Codex & Ubuntu PRoot environment console with Gemini execution capabilities, system metrics, and file automation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
